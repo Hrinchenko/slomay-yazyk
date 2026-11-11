@@ -267,7 +267,7 @@ function speak(text, voice, lang, rate){
 
 function sentThisRound(){ return myGuessRound === S.round && !!myGuess; }
 // ---------- таймер: 30 секунд на відповідь ----------
-const ROUND_SEC = 30;
+const ROUND_SEC = 40;
 let deadlineLocal = 0, deadlineKey = null, upRendered = null;
 function syncDeadline(){
   if (S.phase === "play" && !S.revealed && S.deadline) {
