@@ -196,7 +196,11 @@
   <div class="card hide" id="vScore">
     <h2>Табло</h2>
     <table id="scoreTbl"></table>
-    <div class="btns hide" id="hScoreBtns"><button class="full" id="hRestart">Нова гра (рахунок з нуля)</button></div>
+    <div class="btns hide" id="hScoreBtns">
+      <button class="full" id="hRestart">Почати спочатку (рахунок з нуля)</button>
+      <button class="big full" id="hNewRoom">🆕 Нова гра - нове посилання</button>
+    </div>
+    <div class="hint hide" id="hNewRoomHint">Гравцям не треба нічого робити: їх автоматично перекине в нову гру. Старе посилання перестане працювати.</div>
   </div>
 
   <div class="card hide" id="vPhotos">
@@ -412,6 +416,11 @@ function connectHost(){
     if (!d || typeof d !== "object") return;
     if (d.t === "state" && d.S) { S = d.S; if (S.round !== myGuessRound && !S.revealed) { /* новый раунд */ } render(); }
     else if (d.t === "say") { const p = card(); if (p && d.round === S.round) (d.kind === "en" ? sayEn : sayOk)(p); }
+    else if (d.t === "moved" && typeof d.code === "string" && /^[A-Z0-9]{5}$/.test(d.code)) {
+      connBadge("Ведучий створив нову гру, переходимо…");
+      try { sessionStorage.setItem("slomay_auto", JSON.stringify({ name: joined ? myName : "", pin: (mode === "co" || wantCo) ? coPin : "" })); } catch(e) {}
+      setTimeout(() => { location.href = location.pathname + "?game=" + d.code; }, 1500);
+    }
     else if (d.t === "cohost") {
       if (d.ok) { mode = "co"; isAdmin = true; render(); }
       else { wantCo = false; $("pinMsg").textContent = "ПІН не підійшов."; }
@@ -454,7 +463,10 @@ function renderAdmin(){
   $("inviteBox").classList.toggle("hide", mode !== "main");
   if (S.phase !== "play") {
     show("vLobby","vScore");
-    $("hScoreBtns").classList.remove("hide");
+    $("hScoreBtns").classList.toggle("hide", mode !== "main");
+    $("hRestart").classList.add("hide");
+    $("hNewRoom").classList.toggle("hide", mode !== "main");
+    $("hNewRoomHint").classList.toggle("hide", mode !== "main");
     $("hCount").textContent = ps.length;
     $("hLobbyList").innerHTML = ps.map(p => `<div class="li"><span>${esc(p.name)}</span><span class="tag yes">у грі</span></div>`).join("") || '<div class="hint">Поки нікого.</div>';
     $("startBtn").disabled = ps.length === 0;
@@ -462,6 +474,9 @@ function renderAdmin(){
   }
   show("vHost","vScore","vPhotos");
   $("hScoreBtns").classList.remove("hide");
+  $("hRestart").classList.remove("hide");
+  $("hNewRoom").classList.toggle("hide", mode !== "main");
+  $("hNewRoomHint").classList.toggle("hide", mode !== "main");
   const p = card();
   $("hCounter").textContent = (S.pos+1) + " / " + S.order.length;
   $("hCountry").textContent = p.c;
@@ -531,6 +546,14 @@ $("hReveal").onclick = () => act("reveal");
 $("hOk2").onclick = () => act("ok");
 $("hNext").onclick = () => act("next");
 $("hRestart").onclick = () => act("restart");
+$("hNewRoom").onclick = () => {
+  if (mode !== "main") return;
+  const newCode = rand(5, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789");
+  conns.forEach(c => { try { c.conn.send({ t:"moved", code:newCode }); } catch(e) {} });
+  try { sessionStorage.setItem("slomay_code", newCode); } catch(e) {} // ПІН лишається той самий
+  $("hNewRoom").disabled = true; $("hNewRoom").textContent = "Створюємо нову гру…";
+  setTimeout(() => { try { peer.destroy(); } catch(e) {} location.href = location.pathname + "?game=" + newCode; }, 800);
+};
 $("hList").onclick = e => { const k = e.target.dataset.k; if (k !== undefined) act("toggle", +k); };
 
 // ---------- фото (только на своём экране) ----------
@@ -565,7 +588,12 @@ $("manyFiles").onchange = e => {
   if (typeof Peer === "undefined") { $("offTxt").textContent = "Не завантажилася бібліотека зв'язку. Перевірте інтернет і оновіть сторінку."; show("vOffline"); return; }
   const g = (new URLSearchParams(location.search).get("game") || "").toUpperCase().replace(/[^A-Z0-9]/g,"");
   let wasMain = false; try { wasMain = sessionStorage.getItem("slomay_main") === "1"; } catch(e) {}
-  if (g && !(wasMain && sessionStorage.getItem("slomay_code") === g)) { startGuest(g); show("vJoin"); $("myName").value = myName; }
+  if (g && !(wasMain && sessionStorage.getItem("slomay_code") === g)) {
+    startGuest(g); show("vJoin"); $("myName").value = myName;
+    let auto = null; try { auto = JSON.parse(sessionStorage.getItem("slomay_auto") || "null"); sessionStorage.removeItem("slomay_auto"); } catch(e) {}
+    if (auto && auto.pin) { wantCo = true; coPin = String(auto.pin); }
+    else if (auto && auto.name) { myName = auto.name; joined = true; show("vWait"); $("waitName").textContent = myName; }
+  }
   else if (wasMain) startMain();
   else show("vStart");
 })();
