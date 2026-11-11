@@ -213,7 +213,7 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 const PLAYERS = [
@@ -247,9 +247,10 @@ const VIEWS = ["vStart","vLoading","vOffline","vJoin","vWait","vCard","vLobby","
 function show(...ids){ VIEWS.forEach(v => $(v).classList.toggle("hide", !ids.includes(v))); }
 function esc(s){ return String(s).replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch])); }
 function shuffle(a){ for(let k=a.length-1;k>0;k--){const j=Math.floor(Math.random()*(k+1));[a[k],a[j]]=[a[j],a[k]];} return a; }
+function rand(n, abc){ let s = ""; for (let k=0;k<n;k++) s += abc[Math.floor(Math.random()*abc.length)]; return s; }
 function connBadge(txt, bad){ const c = $("conn"); c.textContent = txt; c.classList.toggle("hide", !txt); c.classList.toggle("bad", !!bad); }
 
-// ---------- голоса ----------
+// ---------- голоси ----------
 const synth = window.speechSynthesis;
 let voices = [];
 function loadVoices(){ voices = synth ? synth.getVoices() : []; }
@@ -267,7 +268,7 @@ function sayEn(p){ speak(p.en, enVoice(), "en-GB", 0.95); }
 function sayOk(p){ const v = pickVoice(p.lang); if (v) speak(p.native, v, p.lang, 0.85); else speak(p.ru, pickVoice("uk"), "uk-UA", 0.85); }
 function unlockAudio(){ if (synth) { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; synth.speak(u); } }
 
-// ---------- сверка ответа ----------
+// ---------- звірка відповіді ----------
 function clean(s){ return s.toLowerCase().replace(/ё/g,"е").replace(/ґ/g,"г").replace(/ы/g,"и").replace(/[^а-яіїєa-z]/g,""); }
 function lev(a,b){
   const d = Array.from({length:a.length+1}, (_,x) => [x]);
@@ -282,21 +283,53 @@ function isClose(g, right){
   return 1 - lev(a,b)/Math.max(a.length,b.length) >= 0.8 || 1 - lev(a,last)/Math.max(a.length,last.length) >= 0.85;
 }
 
-// ---------- роли и состояние ----------
-// mode: "main" - главный ведущий (хранит игру), "co" - второй ведущий, "player"
+// ---------- зв'язок через публічний MQTT-сервер ----------
+// Усі (ведучий і гравці) підключаються до одного сервера повідомлень, тож мережа гравця не важлива.
+const BROKERS = ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt"];
+const NS = "zlamyazyka/v1/";
+const myId = (() => { let id = ""; try { id = sessionStorage.getItem("slomay_id") || ""; } catch(e) {} if (!id) { id = rand(10, "abcdefghijkmnpqrstuvwxyz23456789"); try { sessionStorage.setItem("slomay_id", id); } catch(e) {} } return id; })();
+let client = null, code = "", pin = "";
+const T = { state:()=>NS+code+"/state", pres:id=>NS+code+"/p/"+id, presAll:()=>NS+code+"/p/+", cmd:()=>NS+code+"/cmd", say:()=>NS+code+"/say" };
+
+function connect(onReady, brokerIdx){
+  brokerIdx = brokerIdx || 0;
+  if (typeof mqtt === "undefined") { fail("Не завантажилася бібліотека зв'язку. Перевірте інтернет і оновіть сторінку."); return; }
+  const opts = { clientId:"zl_" + myId + "_" + rand(4,"abcdef0123"), keepalive:20, reconnectPeriod:2000, connectTimeout:8000, clean:true };
+  if (mode === "player") opts.will = { topic:T.pres(myId), payload:"", retain:true, qos:1 };
+  const c = mqtt.connect(BROKERS[brokerIdx], opts);
+  let ready = false;
+  const giveUp = setTimeout(() => { if (!ready) { c.end(true); if (brokerIdx + 1 < BROKERS.length) connect(onReady, brokerIdx + 1); else fail("Не вдалося підключитися до сервера гри. Спробуйте іншу мережу (наприклад, мобільний інтернет)."); } }, 9000);
+  c.on("connect", () => {
+    connBadge("");
+    if (!ready) { ready = true; clearTimeout(giveUp); client = c; onReady(); }
+    else { resubscribe(); if (mode !== "main") publishMe(); }
+  });
+  c.on("reconnect", () => { if (ready) connBadge("Відновлюємо зв'язок…", true); });
+  c.on("offline", () => { if (ready) connBadge("Немає зв'язку…", true); });
+  c.on("message", (topic, buf) => {
+    let d = null; const txt = buf.toString();
+    if (txt) { try { d = JSON.parse(txt); } catch(e) { return; } }
+    onMessage(topic, d);
+  });
+}
+function fail(msg){ $("offTxt").textContent = msg; show("vOffline"); }
+function pub(topic, obj, retain){ if (client) client.publish(topic, obj === null ? "" : JSON.stringify(obj), { qos:1, retain:!!retain }); }
+let subs = [];
+function sub(list){ subs = list; resubscribe(); }
+function resubscribe(){ if (client && subs.length) client.subscribe(subs, { qos:1 }); }
+
+// ---------- ролі і стан ----------
+// mode: "main" - головний ведучий (тримає гру), "co" - другий ведучий, "player"
 let mode = null, isAdmin = false;
-let S = { phase:"lobby", roster:[] };
-let skip = false, lastRoundSeen = null;
+let S = { phase:"lobby", roster:[], admins:[] };
+let lastRoundSeen = null;
 let myName = ""; try { myName = localStorage.getItem("slomay_name") || ""; } catch(e) {}
-const ID_PREFIX = "slomay-fb-";
 function card(){ return S.phase === "play" ? PLAYERS[S.order[S.pos]] : null; }
 function roster(){ return S.roster || []; }
 
-// ================= ГЛАВНЫЙ ВЕДУЩИЙ =================
-let peer = null, code = "", pin = "";
-const conns = new Map(); // conn.peer -> {conn, name, guess, round, admin}
-
-function rand(n, abc){ let s = ""; for (let k=0;k<n;k++) s += abc[Math.floor(Math.random()*abc.length)]; return s; }
+// ================= ГОЛОВНИЙ ВЕДУЧИЙ =================
+const pres = new Map(); // clientId -> {name, guess, round, role, pin}
+let resumed = false;
 
 function startMain(){
   mode = "main"; isAdmin = true;
@@ -305,73 +338,41 @@ function startMain(){
   if (!pin) pin = rand(4, "0123456789");
   try { sessionStorage.setItem("slomay_code", code); sessionStorage.setItem("slomay_pin", pin); sessionStorage.setItem("slomay_main", "1"); } catch(e) {}
   $("loadTxt").textContent = "Відкриваємо стадіон…"; show("vLoading");
-  openMainPeer(0);
-}
-function openMainPeer(tries){
-  peer = new Peer(ID_PREFIX + code);
-  peer.on("open", () => {
+  connect(() => {
     const url = location.origin + location.pathname + "?game=" + code;
     $("hCode").textContent = code; $("hLink").value = url; $("hPin").textContent = pin;
-    $("qr").innerHTML = ""; try { new QRCode($("qr"), { text:url, width:160, height:160 }); } catch(e) { $("qr").remove(); }
-    connBadge("");
-    updateRoster(); render();
+    $("qr").innerHTML = ""; try { new QRCode($("qr"), { text:url, width:160, height:160 }); } catch(e) {}
+    sub([T.state(), T.presAll(), T.cmd(), T.say()]);
+    // якщо за 1.5 с не прийшов збережений стан цієї гри - починаємо з лобі
+    setTimeout(() => { if (!resumed) { resumed = true; commit({ phase:"lobby", scores:{}, answers:[], revealed:false, skip:false }); } }, 1500);
+    render();
   });
-  peer.on("connection", conn => {
-    conn.on("open", () => { conns.set(conn.peer, { conn, name:"", guess:"", round:null, admin:false }); sendTo(conn); });
-    conn.on("data", d => onMainData(conn, d));
-    conn.on("close", () => { conns.delete(conn.peer); updateRoster(); render(); broadcast(); });
-    conn.on("error", () => {});
-  });
-  peer.on("disconnected", () => { connBadge("Зв'язок із сервером втрачено, відновлюємо…", true); setTimeout(() => { try { peer.reconnect(); } catch(e) {} }, 2000); });
-  peer.on("error", err => {
-    if (err.type === "unavailable-id" && tries < 5) { peer.destroy(); setTimeout(() => openMainPeer(tries+1), 3000); return; }
-    if (["network","server-error","socket-error","socket-closed"].includes(err.type)) { connBadge("Немає зв'язку із сервером…", true); return; }
-    if (err.type === "unavailable-id") { $("offTxt").textContent = "Код гри вже зайнятий. Оновіть сторінку за хвилину."; show("vOffline"); }
-  });
-}
-function onMainData(conn, d){
-  const c = conns.get(conn.peer); if (!c || !d || typeof d !== "object") return;
-  if (d.t === "hello") {
-    c.name = String(d.name || "").trim().slice(0,20);
-    if (d.round === S.round && typeof d.guess === "string") { c.guess = d.guess.slice(0,40); c.round = d.round; }
-  } else if (d.t === "guess") {
-    if (d.round !== S.round || S.revealed) return;
-    c.guess = String(d.guess || "").slice(0,40); c.round = d.round;
-  } else if (d.t === "cohost") {
-    if (String(d.pin) === pin) { c.admin = true; c.name = ""; }
-    try { conn.send({ t:"cohost", ok:c.admin }); } catch(e) {}
-  } else if (d.t === "cmd" && c.admin) {
-    doCmd(d.cmd, d.arg);
-    return;
-  }
-  updateRoster(); render(); broadcast();
 }
 function livePlayers(){
   const seen = new Set(), out = [];
-  conns.forEach(c => {
-    if (c.admin || !c.name) return;
-    const k = c.name.toLowerCase(); if (seen.has(k)) return; seen.add(k);
-    out.push({ name:c.name, guess: c.round === S.round ? c.guess : "" });
+  pres.forEach(p => {
+    if (p.role !== "player" || !p.name) return;
+    const k = p.name.toLowerCase(); if (seen.has(k)) return; seen.add(k);
+    out.push({ name:p.name, guess: p.round === S.round && typeof p.guess === "string" ? p.guess : "" });
   });
   return out;
 }
-function updateRoster(){ S.roster = livePlayers().map(p => ({ name:p.name, answered:!!p.guess.trim() })); }
-function publicState(){ return Object.assign({}, S); }
-function sendTo(conn){ try { conn.send({ t:"state", S:publicState() }); } catch(e) {} }
-function broadcast(){ conns.forEach(c => sendTo(c.conn)); }
-function sayAll(kind){ conns.forEach(c => { try { c.conn.send({ t:"say", kind, round:S.round }); } catch(e) {} }); }
-function commit(patch){ Object.assign(S, patch); updateRoster(); render(); broadcast(); }
+function admins(){ const a = []; pres.forEach((p,id) => { if (p.role === "co" && String(p.pin) === pin) a.push(id); }); return a; }
+function updateRoster(){ S.roster = livePlayers().map(p => ({ name:p.name, answered:!!p.guess.trim() })); S.admins = admins(); }
+let pubTimer = null;
+function publishState(){ clearTimeout(pubTimer); pubTimer = setTimeout(() => pub(T.state(), S, true), 60); }
+function commit(patch){ Object.assign(S, patch, { by:myId }); updateRoster(); render(); publishState(); }
 
 function newOrder(){ return shuffle(PLAYERS.map((_,k) => k)); }
 function doCmd(cmd, arg){
   const p = card();
-  if (cmd === "start") { skip = false; commit({ phase:"play", order:newOrder(), pos:0, round:(S.round||0)+1, revealed:false, answers:[], skip:false, scores:S.scores || {} }); }
+  if (cmd === "start") { commit({ phase:"play", order:newOrder(), pos:0, round:(S.round||0)+1, revealed:false, answers:[], skip:false, scores:S.scores || {} }); }
   else if (cmd === "skip") { commit({ skip:true }); }
-  else if (cmd === "en" && p) { sayEn(p); sayAll("en"); }
-  else if (cmd === "ok" && p) { sayOk(p); sayAll("ok"); }
+  else if (cmd === "en" && p) { pub(T.say(), { kind:"en", round:S.round, n:Date.now() }); }
+  else if (cmd === "ok" && p) { pub(T.say(), { kind:"ok", round:S.round, n:Date.now() }); }
   else if (cmd === "reveal" && p && !S.revealed) {
     const answers = livePlayers().filter(x => x.guess.trim()).map(x => ({ name:x.name, guess:x.guess, ok:isClose(x.guess, p.ru) }));
-    commit({ revealed:true, answers }); sayOk(p); sayAll("ok");
+    commit({ revealed:true, answers }); pub(T.say(), { kind:"ok", round:S.round, n:Date.now() });
   }
   else if (cmd === "toggle" && S.revealed) {
     const k = +arg; commit({ answers: S.answers.map((a,i) => i === k ? Object.assign({}, a, { ok:!a.ok }) : a) });
@@ -387,61 +388,73 @@ function doCmd(cmd, arg){
   else if (cmd === "restart") { commit({ phase:"lobby", scores:{}, answers:[], revealed:false, skip:false }); }
 }
 
-// ================= ИГРОК / ВТОРОЙ ВЕДУЩИЙ =================
-let hostConn = null, joined = false, myGuess = "", myGuessRound = null, wantCo = false, coPin = "";
+// ================= ГРАВЕЦЬ / ДРУГИЙ ВЕДУЧИЙ =================
+let joined = false, myGuess = "", myGuessRound = null, wantCo = false, coPin = "", gotState = false;
 function startGuest(gameCode){
   mode = "player"; code = gameCode;
-  $("loadTxt").textContent = "Підключаємося до гри " + code + "…"; show("vLoading");
-  peer = new Peer();
-  peer.on("open", () => connectHost());
-  peer.on("disconnected", () => { setTimeout(() => { try { peer.reconnect(); } catch(e) {} }, 2000); });
-  peer.on("error", err => {
-    if (err.type === "peer-unavailable") {
-      connBadge("Ведучий не в мережі, чекаємо…", true);
-      if (!hostConn || !hostConn.open) { if (S.phase === "lobby" && !joined && !$("vJoin").offsetParent) { $("offTxt").textContent = "Гру з кодом " + code + " не знайдено. Перевірте код або попросіть ведучого оновити сторінку."; show("vOffline"); } setTimeout(connectHost, 3000); }
-    } else if (["network","server-error","socket-error","socket-closed"].includes(err.type)) connBadge("Немає зв'язку із сервером…", true);
-  });
-  setTimeout(() => { if (!hostConn || !hostConn.open) { if (!$("vLoading").classList.contains("hide")) { $("offTxt").textContent = "Не вдалося зв'язатися з ведучим. Іноді заважає мережа (наприклад, корпоративний Wi-Fi) - спробуйте мобільний інтернет."; show("vOffline"); } } }, 15000);
-}
-function connectHost(){
-  if (hostConn && hostConn.open) return;
-  hostConn = peer.connect(ID_PREFIX + code, { reliable:true });
-  hostConn.on("open", () => {
-    connBadge("");
-    if (wantCo && coPin) hostConn.send({ t:"cohost", pin:coPin });
-    else if (joined) hostConn.send({ t:"hello", name:myName, guess:myGuess, round:myGuessRound });
+  connect(() => {
+    sub([T.state(), T.say()]);
+    publishMe();
+    setTimeout(() => { if (!gotState) connBadge("Гру " + code + " не знайдено або ведучий ще не відкрив її", true); }, 4000);
     render();
   });
-  hostConn.on("data", d => {
-    if (!d || typeof d !== "object") return;
-    if (d.t === "state" && d.S) { S = d.S; if (S.round !== myGuessRound && !S.revealed) { /* новый раунд */ } render(); }
-    else if (d.t === "say") { const p = card(); if (p && d.round === S.round) (d.kind === "en" ? sayEn : sayOk)(p); }
-    else if (d.t === "moved" && typeof d.code === "string" && /^[A-Z0-9]{5}$/.test(d.code)) {
-      connBadge("Ведучий створив нову гру, переходимо…");
-      try { sessionStorage.setItem("slomay_auto", JSON.stringify({ name: joined ? myName : "", pin: (mode === "co" || wantCo) ? coPin : "" })); } catch(e) {}
-      setTimeout(() => { location.href = location.pathname + "?game=" + d.code; }, 1500);
-    }
-    else if (d.t === "cohost") {
-      if (d.ok) { mode = "co"; isAdmin = true; render(); }
-      else { wantCo = false; $("pinMsg").textContent = "ПІН не підійшов."; }
-    }
-  });
-  hostConn.on("close", () => { connBadge("Зв'язок із ведучим втрачено, перепідключаємося…", true); setTimeout(connectHost, 2000); });
-  hostConn.on("error", () => {});
+}
+function publishMe(){
+  if (!client) return;
+  if (wantCo && coPin) pub(T.pres(myId), { role:"co", pin:coPin }, true);
+  else if (joined) pub(T.pres(myId), { role:"player", name:myName, guess:myGuess, round:myGuessRound }, true);
 }
 function act(cmd, arg){
   if (mode === "main") doCmd(cmd, arg);
-  else if (hostConn && hostConn.open) hostConn.send({ t:"cmd", cmd, arg });
+  else pub(T.cmd(), { from:myId, pin:coPin, cmd, arg });
 }
 
-// ---------- отрисовка ----------
+// ---------- вхідні повідомлення ----------
+let lastSay = 0;
+function onMessage(topic, d){
+  if (topic === T.state()) {
+    if (!d) return;
+    if (mode === "main") {
+      // збережений стан цієї гри (наприклад, після перезавантаження ведучого) - продовжуємо з нього
+      if (!resumed) { resumed = true; if (d.by === myId || d.phase) { S = Object.assign({ roster:[], admins:[] }, d); delete S.moved; updateRoster(); render(); publishState(); } }
+      return;
+    }
+    gotState = true; connBadge("");
+    if (d.moved && /^[A-Z0-9]{5}$/.test(d.moved) && d.moved !== code) {
+      connBadge("Ведучий створив нову гру, переходимо…");
+      try { sessionStorage.setItem("slomay_auto", JSON.stringify({ name: joined ? myName : "", pin: wantCo ? coPin : "" })); } catch(e) {}
+      setTimeout(() => { location.href = location.pathname + "?game=" + d.moved; }, 1200);
+      return;
+    }
+    S = d;
+    const amAdmin = wantCo && (S.admins || []).includes(myId);
+    if (wantCo && !amAdmin && !isAdmin) $("pinMsg").textContent = "Перевіряємо… Якщо довго - перевірте ПІН.";
+    if (amAdmin) { mode = "co"; isAdmin = true; } 
+    render();
+  }
+  else if (topic === T.say()) {
+    if (!d || d.round !== S.round || d.n === lastSay) return; lastSay = d.n;
+    const p = card(); if (!p) return;
+    (d.kind === "en" ? sayEn : sayOk)(p);
+  }
+  else if (mode === "main" && topic.startsWith(NS + code + "/p/")) {
+    const id = topic.slice((NS + code + "/p/").length);
+    if (!d) pres.delete(id); else pres.set(id, { name:String(d.name||"").trim().slice(0,20), guess:String(d.guess||"").slice(0,40), round:d.round, role:d.role, pin:d.pin });
+    updateRoster(); render(); publishState();
+  }
+  else if (mode === "main" && topic === T.cmd()) {
+    if (!d || String(d.pin) !== pin) return;
+    doCmd(d.cmd, d.arg);
+  }
+}
+
+// ---------- відмальовка ----------
 function render(){
   if (isAdmin) renderAdmin(); else renderPlayer();
   renderScore();
 }
 function renderPlayer(){
-  if (!hostConn || !hostConn.open) { if (!joined) return; }
-  if (!joined) { show("vJoin"); if (!$("myName").value) $("myName").value = myName; return; }
+  if (!joined) { if (!wantCo) { show("vJoin"); if (!$("myName").value) $("myName").value = myName; } return; }
   if (S.phase !== "play") { show("vWait"); $("waitName").textContent = myName; $("waitCount").textContent = roster().length; return; }
   show("vCard","vScore");
   const p = card();
@@ -517,21 +530,17 @@ $("copyBtn").onclick = () => {
 $("joinBtn").onclick = () => {
   const n = $("myName").value.trim().slice(0,20); if (!n) return;
   myName = n; joined = true; try { localStorage.setItem("slomay_name", n); } catch(e) {}
-  unlockAudio();
-  if (hostConn && hostConn.open) hostConn.send({ t:"hello", name:n });
-  render();
+  unlockAudio(); publishMe(); render();
 };
 $("myName").onkeydown = e => { if (e.key === "Enter") $("joinBtn").click(); };
 $("coLink").onclick = e => { e.preventDefault(); $("coBox").classList.toggle("hide"); };
 $("pinBtn").onclick = () => {
   coPin = $("pinIn").value.trim(); if (!coPin) return;
-  wantCo = true; unlockAudio(); $("pinMsg").textContent = "Перевіряємо…";
-  if (hostConn && hostConn.open) hostConn.send({ t:"cohost", pin:coPin });
+  wantCo = true; unlockAudio(); $("pinMsg").textContent = "Перевіряємо…"; publishMe();
 };
 $("sendBtn").onclick = () => {
   const g = $("myGuess").value.trim().slice(0,40); if (!g) return;
-  myGuess = g; myGuessRound = S.round;
-  if (hostConn && hostConn.open) hostConn.send({ t:"guess", guess:g, round:S.round });
+  myGuess = g; myGuessRound = S.round; publishMe();
   $("sentTxt").textContent = "Відповідь надіслано. Можна виправити, поки ведучий не відкрив правильний варіант.";
 };
 $("myGuess").onkeydown = e => { if (e.key === "Enter") $("sendBtn").click(); };
@@ -546,17 +555,18 @@ $("hReveal").onclick = () => act("reveal");
 $("hOk2").onclick = () => act("ok");
 $("hNext").onclick = () => act("next");
 $("hRestart").onclick = () => act("restart");
+$("hList").onclick = e => { const k = e.target.dataset.k; if (k !== undefined) act("toggle", +k); };
 $("hNewRoom").onclick = () => {
   if (mode !== "main") return;
   const newCode = rand(5, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789");
-  conns.forEach(c => { try { c.conn.send({ t:"moved", code:newCode }); } catch(e) {} });
+  pub(T.state(), Object.assign({}, S, { moved:newCode }), true); // гравців перекине автоматично
   try { sessionStorage.setItem("slomay_code", newCode); } catch(e) {} // ПІН лишається той самий
   $("hNewRoom").disabled = true; $("hNewRoom").textContent = "Створюємо нову гру…";
-  setTimeout(() => { try { peer.destroy(); } catch(e) {} location.href = location.pathname + "?game=" + newCode; }, 800);
+  setTimeout(() => { try { client.end(); } catch(e) {} location.href = location.pathname + "?game=" + newCode; }, 900);
 };
-$("hList").onclick = e => { const k = e.target.dataset.k; if (k !== undefined) act("toggle", +k); };
+window.addEventListener("pagehide", () => { if (mode === "player" && client) { try { client.publish(T.pres(myId), "", { qos:0, retain:true }); } catch(e) {} } });
 
-// ---------- фото (только на своём экране) ----------
+// ---------- фото (тільки на своєму екрані) ----------
 const photos = {};
 function norm(s){
   return s.toLowerCase().replace(/[øö]/g,"o").replace(/ð/g,"d").replace(/ł/g,"l").replace(/ı/g,"i").replace(/æ/g,"ae")
@@ -585,14 +595,14 @@ $("manyFiles").onchange = e => {
 
 // ---------- старт ----------
 (function boot(){
-  if (typeof Peer === "undefined") { $("offTxt").textContent = "Не завантажилася бібліотека зв'язку. Перевірте інтернет і оновіть сторінку."; show("vOffline"); return; }
   const g = (new URLSearchParams(location.search).get("game") || "").toUpperCase().replace(/[^A-Z0-9]/g,"");
-  let wasMain = false; try { wasMain = sessionStorage.getItem("slomay_main") === "1"; } catch(e) {}
-  if (g && !(wasMain && sessionStorage.getItem("slomay_code") === g)) {
-    startGuest(g); show("vJoin"); $("myName").value = myName;
+  let wasMain = false, storedCode = ""; try { wasMain = sessionStorage.getItem("slomay_main") === "1"; storedCode = sessionStorage.getItem("slomay_code") || ""; } catch(e) {}
+  if (g && !(wasMain && storedCode === g)) {
+    show("vJoin"); $("myName").value = myName;
     let auto = null; try { auto = JSON.parse(sessionStorage.getItem("slomay_auto") || "null"); sessionStorage.removeItem("slomay_auto"); } catch(e) {}
-    if (auto && auto.pin) { wantCo = true; coPin = String(auto.pin); }
+    if (auto && auto.pin) { wantCo = true; coPin = String(auto.pin); $("coBox").classList.remove("hide"); $("pinIn").value = coPin; $("pinMsg").textContent = "Перевіряємо…"; }
     else if (auto && auto.name) { myName = auto.name; joined = true; show("vWait"); $("waitName").textContent = myName; }
+    startGuest(g);
   }
   else if (wasMain) startMain();
   else show("vStart");
