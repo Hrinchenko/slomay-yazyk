@@ -72,6 +72,8 @@
   td:last-child { text-align:right; font-family:"Bebas Neue",Impact,sans-serif; font-size:30px; color:#ff9d2e;
                   text-shadow:0 0 8px rgba(255,157,46,.6); letter-spacing:2px; }
   .hide { display:none !important; }
+  .timer { font-family:"Bebas Neue",Impact,sans-serif; font-size:40px; line-height:1; color:var(--acc); margin:10px 0 4px; letter-spacing:1px; }
+  .timer.low { color:#ff6b6b; }
   .me { color:var(--acc); font-weight:700; }
   .ball { display:inline-block; animation:spin 1.6s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
@@ -99,6 +101,7 @@
       <input type="text" id="codeIn" placeholder="Код, наприклад K7QXM" maxlength="5" style="text-transform:uppercase">
       <button id="codeBtn">Войти</button>
     </div>
+    <div class="hint" style="margin-top:18px">Інша гра: <a href="procedury.html" style="color:var(--acc)">💅 Гра «Що це було?» про б'юті-процедури</a></div>
   </div>
 
   <div class="card" id="vLoading"><div class="hint" style="margin:0"><span class="ball">⚽</span> <span id="loadTxt">Виходимо на поле…</span></div></div>
@@ -136,6 +139,7 @@
     <div class="meta"><span id="pCounter"></span><span id="pCountry"></span></div>
     <div class="name" id="pName"></div>
     <div id="pAsk">
+      <div class="timer" id="pTimer"></div>
       <span class="lbl" style="margin-top:14px">Як це звучить українською?</span>
       <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
         <input type="text" id="myGuess" placeholder="Ваш варіант" maxlength="40">
@@ -175,6 +179,7 @@
     <div class="list" id="hList"></div>
     <div class="host" id="hPult">
       <div class="hostTitle">👑 Пульт ведучого</div>
+      <div class="timer" id="hTimer"></div>
       <div class="hint" id="hWait" style="margin-top:0"></div>
       <div class="btns">
         <button class="full" id="hEn" disabled>🔊 Як читає англієць</button>
@@ -265,6 +270,33 @@ function speak(text, voice, lang, rate){
   if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = lang;
   u.rate = rate; synth.speak(u);
 }
+
+function sentThisRound(){ return myGuessRound === S.round && !!myGuess; }
+// ---------- таймер: 30 секунд на відповідь ----------
+const ROUND_SEC = 30;
+let deadlineLocal = 0, deadlineKey = null, upRendered = null;
+function syncDeadline(){
+  if (S.phase === "play" && !S.revealed && S.deadline) {
+    const key = S.round + ":" + S.deadline;
+    if (key !== deadlineKey) { deadlineKey = key; deadlineLocal = Date.now() + (S.deadline - (S.now || Date.now())); }
+  } else { deadlineKey = null; deadlineLocal = 0; }
+}
+function timeLeft(){ return deadlineLocal ? Math.max(0, Math.ceil((deadlineLocal - Date.now()) / 1000)) : null; }
+function timeUp(){ return !!deadlineLocal && Date.now() >= deadlineLocal; }
+setInterval(() => {
+  syncDeadline();
+  const t = timeLeft();
+  ["pTimer","hTimer"].forEach(id => { const el = $(id); if (!el) return; el.textContent = t === null ? "" : (t > 0 ? "⏱ " + t : "⏱ Час вийшов"); el.classList.toggle("low", t !== null && t <= 5); });
+  if (timeUp()) {
+    if (!isAdmin && !$("myGuess").disabled) {
+      if ($("myGuess").value.trim() && !sentThisRound()) $("sendBtn").click();
+      $("myGuess").disabled = true; $("sendBtn").disabled = true;
+      if (!sentThisRound()) $("sentTxt").textContent = "Час вийшов, відповідь не надіслана.";
+    }
+    if (isAdmin && upRendered !== deadlineKey) { upRendered = deadlineKey; render(); }
+  }
+}, 250);
+
 function sayEn(p){ speak(p.en, enVoice(), "en-GB", 0.95); }
 function sayOk(p){ const v = pickVoice(p.lang); if (v) speak(p.native, v, p.lang, 0.85); else speak(p.ru, pickVoice("uk"), "uk-UA", 0.85); }
 function unlockAudio(){ if (synth) { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; synth.speak(u); } }
@@ -361,13 +393,13 @@ function livePlayers(){
 function admins(){ const a = []; pres.forEach((p,id) => { if (p.role === "co" && String(p.pin) === pin) a.push(id); }); return a; }
 function updateRoster(){ S.roster = livePlayers().map(p => ({ name:p.name, answered:!!p.guess.trim() })); S.admins = admins(); }
 let pubTimer = null;
-function publishState(){ clearTimeout(pubTimer); pubTimer = setTimeout(() => pub(T.state(), S, true), 60); }
+function publishState(){ clearTimeout(pubTimer); pubTimer = setTimeout(() => { S.now = Date.now(); pub(T.state(), S, true); }, 60); }
 function commit(patch){ Object.assign(S, patch, { by:myId }); updateRoster(); render(); publishState(); }
 
 function newOrder(){ return shuffle(PLAYERS.map((_,k) => k)); }
 function doCmd(cmd, arg){
   const p = card();
-  if (cmd === "start") { commit({ phase:"play", order:newOrder(), pos:0, round:(S.round||0)+1, revealed:false, answers:[], skip:false, scores:S.scores || {} }); }
+  if (cmd === "start") { commit({ phase:"play", order:newOrder(), pos:0, round:(S.round||0)+1, revealed:false, answers:[], skip:false, scores:S.scores || {}, deadline:Date.now()+ROUND_SEC*1000 }); }
   else if (cmd === "skip") { commit({ skip:true }); }
   else if (cmd === "en" && p) { pub(T.say(), { kind:"en", round:S.round, n:Date.now() }); }
   else if (cmd === "ok" && p) { pub(T.say(), { kind:"ok", round:S.round, n:Date.now() }); }
@@ -384,7 +416,7 @@ function doCmd(cmd, arg){
     let pos = S.pos + 1, order = S.order;
     if (pos >= order.length) { order = newOrder(); pos = 0; }
     if (synth) synth.cancel();
-    commit({ pos, order, round:S.round + 1, revealed:false, answers:[], skip:false, scores });
+    commit({ pos, order, round:S.round + 1, revealed:false, answers:[], skip:false, scores, deadline:Date.now()+ROUND_SEC*1000 });
   }
   else if (cmd === "restart") { commit({ phase:"lobby", scores:{}, answers:[], revealed:false, skip:false }); }
 }
@@ -440,6 +472,8 @@ function onMessage(topic, d){
   }
   else if (mode === "main" && topic.startsWith(NS + code + "/p/")) {
     const id = topic.slice((NS + code + "/p/").length);
+    const old = pres.get(id);
+    if (d && old && d.round === S.round && S.deadline && Date.now() > S.deadline + 3000 && d.guess !== old.guess) d = Object.assign({}, d, { guess:old.guess });
     if (!d) pres.delete(id); else pres.set(id, { name:String(d.name||"").trim().slice(0,20), guess:String(d.guess||"").slice(0,40), round:d.round, role:d.role, pin:d.pin });
     updateRoster(); render(); publishState();
   }
@@ -464,7 +498,7 @@ function renderPlayer(){
   $("pName").textContent = p.full;
   if (!S.revealed) {
     $("pAsk").classList.remove("hide"); $("pAnswer").classList.add("hide");
-    if (lastRoundSeen !== S.round) { lastRoundSeen = S.round; $("myGuess").value = ""; $("sentTxt").textContent = ""; }
+    if (lastRoundSeen !== S.round) { lastRoundSeen = S.round; $("myGuess").value = ""; $("sentTxt").textContent = ""; $("myGuess").disabled = false; $("sendBtn").disabled = false; }
   } else {
     $("pAsk").classList.add("hide"); $("pAnswer").classList.remove("hide");
     $("pOk").textContent = p.ru;
@@ -502,7 +536,7 @@ function renderAdmin(){
     $("hPult").classList.remove("hide"); $("hAnswer").classList.add("hide");
     const answered = ps.filter(x => x.answered).length, left = ps.length - answered;
     $("hList").innerHTML = ps.map(x => `<div class="li"><span>${esc(x.name)}</span><span class="tag ${x.answered?"yes":""}">${x.answered?"відповів":"думає…"}</span></div>`).join("") || '<div class="hint">Гравців немає.</div>';
-    const ready = (ps.length > 0 && left === 0) || S.skip;
+    const ready = (ps.length > 0 && left === 0) || S.skip || timeUp();
     $("hEn").disabled = $("hReveal").disabled = !ready;
     $("hSkip").classList.toggle("hide", ready || answered === 0);
     $("hWait").textContent = ready ? "Відповіді зібрано. Спершу англійське прочитання, потім правильний варіант." : `Чекаємо відповіді: ${answered} з ${ps.length}.`;

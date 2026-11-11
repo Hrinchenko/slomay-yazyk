@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Що це було? Б'юті-процедури</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --grass1:#2f7d3a; --grass2:#2a7134; --panel:rgba(10,32,16,.82); --line:rgba(255,255,255,.22); --chalk:#f4f7f2;
+          --txt:#f4f7f2; --mut:#b9d1bf; --acc:#ffd23f; --en:#ffd23f; --red:#e5484d; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--txt); min-height:100vh;
+         display:flex; justify-content:center; padding:24px 16px 40px;
+         background:
+           radial-gradient(circle at 50% 0, transparent 0 118px, rgba(255,255,255,.35) 119px 121px, transparent 122px),
+           linear-gradient(rgba(255,255,255,.35),rgba(255,255,255,.35)) 50% 0/100% 2px no-repeat,
+           repeating-linear-gradient(90deg, var(--grass1) 0 80px, var(--grass2) 80px 160px);
+         background-attachment:fixed; }
+  .wrap { width:100%; max-width:600px; }
+  h1 { font-family:"Bebas Neue",Impact,sans-serif; font-size:52px; letter-spacing:2px; margin:0 0 2px; line-height:1;
+       text-shadow:0 3px 0 rgba(0,0,0,.35); }
+  h2 { font-family:"Bebas Neue",Impact,sans-serif; font-size:26px; letter-spacing:1px; font-weight:400; margin:0 0 10px; }
+  .sub { color:var(--chalk); opacity:.9; font-size:14px; margin:0 0 20px; line-height:1.45; text-shadow:0 1px 2px rgba(0,0,0,.4); }
+  .card { background:var(--panel); border:2px solid var(--line); border-radius:18px; padding:22px; margin-bottom:16px;
+          backdrop-filter:blur(3px); box-shadow:0 10px 30px rgba(0,0,0,.25); position:relative; }
+  .meta { display:flex; justify-content:space-between; color:var(--mut); font-size:13px; margin-bottom:12px; }
+  .meta span:first-child { font-family:"Bebas Neue",Impact,sans-serif; font-size:20px; letter-spacing:1px; color:var(--acc); }
+  .name { font-family:"Bebas Neue",Impact,sans-serif; font-size:46px; letter-spacing:1px; line-height:1; margin-bottom:6px; overflow-wrap:anywhere; }
+  button { font:inherit; font-size:15px; font-weight:600; padding:12px 10px; border-radius:12px; border:2px solid var(--line);
+           background:rgba(255,255,255,.08); color:var(--txt); cursor:pointer; transition:transform .08s, background .15s; }
+  button:hover:not(:disabled) { background:rgba(255,255,255,.16); }
+  button:active:not(:disabled) { transform:scale(.97); }
+  button:disabled { opacity:.35; cursor:default; }
+  button.big { background:var(--chalk); color:#123a1b; border-color:var(--chalk); font-weight:800; }
+  button.big:hover:not(:disabled) { background:#fff; }
+  .btns { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+  .full { grid-column:1 / -1; width:100%; }
+  input[type=text] { font:inherit; font-size:16px; width:100%; padding:12px 14px; border-radius:12px; border:2px solid var(--line);
+           background:rgba(0,0,0,.35); color:var(--txt); }
+  input[type=text]::placeholder { color:#8fae98; }
+  input[type=text]:focus { outline:none; border-color:var(--chalk); }
+  .hint { color:var(--mut); font-size:13px; margin-top:10px; line-height:1.45; }
+  .big-ok { font-family:"Bebas Neue",Impact,sans-serif; font-size:40px; letter-spacing:1px; color:var(--acc); line-height:1.05; }
+  .answer { margin-top:16px; padding:16px; border-radius:14px; background:rgba(0,0,0,.35); border:2px dashed var(--chalk); }
+  .answer b, .lbl { display:block; font-size:12px; color:var(--mut); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; }
+  .list { margin-top:12px; }
+  .li { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; padding:9px 0; border-bottom:1px dashed var(--line); font-size:15px; }
+  .li .g { color:var(--mut); font-size:14px; overflow-wrap:anywhere; }
+  .tag { font-size:12px; font-weight:700; padding:4px 10px; border-radius:6px; border:1px solid var(--line); color:var(--mut); white-space:nowrap; }
+  .tag.yes { color:#2b2200; background:var(--acc); border-color:var(--acc); }
+  .mark { width:46px; padding:8px 0; }
+  .mark.on { background:var(--acc); color:#2b2200; border-color:var(--acc); }
+  /* пульт ведущего - как жёлтая карточка судьи */
+  .host { margin-top:18px; padding:14px 14px 14px 56px; border-radius:14px; border:2px solid var(--acc); background:rgba(255,210,63,.08); position:relative; }
+  .host::before { content:""; position:absolute; left:16px; top:16px; width:24px; height:32px; border-radius:4px; background:var(--acc);
+                  transform:rotate(-10deg); box-shadow:2px 2px 0 rgba(0,0,0,.3); }
+  .hostTitle { font-size:12px; color:var(--acc); font-weight:800; margin-bottom:6px; text-transform:uppercase; letter-spacing:1.5px; }
+  #vLobby .hostTitle, #vHost > .hostTitle { margin-bottom:10px; }
+  .count { font-family:"Bebas Neue",Impact,sans-serif; font-size:72px; line-height:1; color:var(--acc); }
+  .photo { width:100%; height:340px; border-radius:14px; overflow:hidden; margin-bottom:14px; display:none; border:2px solid var(--chalk); background:#f4f7f2; }
+  .photo img { width:100%; height:100%; object-fit:contain; display:block; }
+  .upl { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .upl label { font-size:13px; padding:12px; border-radius:12px; border:2px dashed var(--line); text-align:center; cursor:pointer; color:var(--mut); }
+  .upl label:hover { color:var(--txt); border-color:var(--chalk); }
+  .upl input { display:none; }
+  /* табло */
+  #vScore { background:#0b0d0c; border-color:#2a2f2b; }
+  #vScore h2 { color:var(--acc); }
+  table { width:100%; border-collapse:collapse; }
+  td { padding:8px 6px; border-bottom:1px solid #22261f; font-size:16px; }
+  td:last-child { text-align:right; font-family:"Bebas Neue",Impact,sans-serif; font-size:30px; color:#ff9d2e;
+                  text-shadow:0 0 8px rgba(255,157,46,.6); letter-spacing:2px; }
+  .hide { display:none !important; }
+  .photo.q { display:flex !important; align-items:center; justify-content:center; font-size:120px; }
+  .expl { margin-top:12px; font-size:15px; line-height:1.5; }
+  .expl b { display:inline; text-transform:none; letter-spacing:0; font-size:15px; color:var(--acc); }
+  .timer { font-family:"Bebas Neue",Impact,sans-serif; font-size:40px; line-height:1; color:var(--acc); margin:10px 0 4px; letter-spacing:1px; }
+  .timer.low { color:#ff6b6b; }
+  .me { color:var(--acc); font-weight:700; }
+  .ball { display:inline-block; animation:spin 1.6s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style><style>
+  .code { font-family:"Bebas Neue",Impact,sans-serif; font-size:64px; letter-spacing:8px; color:var(--acc); line-height:1; }
+  .linkbox { display:grid; grid-template-columns:1fr auto; gap:8px; margin-top:10px; }
+  .linkbox input { font-size:13px !important; }
+  #qr { background:#fff; padding:10px; border-radius:12px; width:max-content; margin-top:12px; }
+  .conn { position:fixed; top:10px; right:10px; font-size:12px; padding:5px 10px; border-radius:999px; background:rgba(0,0,0,.55); color:var(--mut); }
+  .conn.bad { color:#fff; background:var(--red); }
+</style>
+</head>
+<body>
+<div class="conn hide" id="conn"></div>
+<div class="wrap">
+  <h1>💅 Що це було?</h1>
+  <p class="sub">Гра для чоловіків. На фото б'юті-процедура. Кожен зі свого телефона пише: що це, для чого і яка з цього користь. Коли всі відповіли, ведучий відкриває правильну відповідь.</p>
+
+  <div class="card hide" id="vStart">
+    <h2>Нова гра</h2>
+    <div class="hint" style="margin-top:0">Ведучий створює гру і роздає посилання або QR-код. Гравцям нічого встановлювати не треба.</div>
+    <div class="btns"><button class="big full" id="createBtn">👑 Створити гру (я ведучий)</button></div>
+    <span class="lbl" style="margin-top:20px">Або увійти за кодом гри</span>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+      <input type="text" id="codeIn" placeholder="Код, наприклад K7QXM" maxlength="5" style="text-transform:uppercase">
+      <button id="codeBtn">Войти</button>
+    </div>
+    <div class="hint" style="margin-top:18px">Інша гра: <a href="./" style="color:var(--acc)">⚽ Гра «Злам язика» про футболістів</a></div>
+  </div>
+
+  <div class="card" id="vLoading"><div class="hint" style="margin:0"><span class="ball">⚽</span> <span id="loadTxt">Виходимо на поле…</span></div></div>
+
+  <div class="card hide" id="vOffline">
+    <h2>Не вдалося підключитися</h2>
+    <div class="hint" id="offTxt"></div>
+    <div class="btns"><button class="full" onclick="location.reload()">Спробувати ще раз</button></div>
+  </div>
+
+  <!-- ===== игрок ===== -->
+  <div class="card hide" id="vJoin">
+    <h2>Як вас звати?</h2>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+      <input type="text" id="myName" placeholder="Ваше ім'я" maxlength="20">
+      <button class="big" id="joinBtn">Войти</button>
+    </div>
+    <div class="hint">Ви ведучий №2? <a href="#" id="coLink" style="color:var(--acc)">Увійти як другий ведучий</a></div>
+    <div class="hide" id="coBox">
+      <span class="lbl" style="margin-top:14px">ПІН ведучого (видно в головного ведучого)</span>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+        <input type="text" id="pinIn" placeholder="4 цифри" maxlength="4" inputmode="numeric">
+        <button id="pinBtn">Стати ведучим</button>
+      </div>
+      <div class="hint" id="pinMsg"></div>
+    </div>
+  </div>
+
+  <div class="card hide" id="vWait">
+    <h2>Ви в грі, <span id="waitName" class="me"></span> 👋</h2>
+    <div class="hint">Чекаємо, поки ведучий почне гру. Зараз гравців: <b id="waitCount">0</b>.</div>
+  </div>
+
+  <div class="card hide" id="vCard">
+    <div class="meta"><span id="pCounter"></span><span id="pCountry"></span></div>
+    <div class="photo q" id="pQ"></div>
+    <div class="name" id="pName" style="font-size:28px">Що це? Для чого? Яка користь?</div>
+    <div id="pAsk">
+      <div class="timer" id="pTimer"></div>
+      <span class="lbl" style="margin-top:14px">Ваша версія</span>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+        <input type="text" id="myGuess" placeholder="Наприклад: це щоб вії були довші" maxlength="120">
+        <button class="big" id="sendBtn">Відповісти</button>
+      </div>
+      <div class="hint" id="sentTxt"></div>
+    </div>
+    <div class="answer hide" id="pAnswer">
+      <b>Правильна відповідь</b>
+      <div class="big-ok" id="pOk"></div>
+      <div class="expl" id="pExpl"></div>
+      <button id="pEn" class="hide"></button><button id="pOkBtn" class="hide"></button>
+      <div class="list" id="pList"></div>
+    </div>
+  </div>
+
+  <!-- ===== ведущий ===== -->
+  <div class="card hide" id="vLobby">
+    <div class="hostTitle">👑 Пульт ведучого</div>
+    <div id="inviteBox">
+      <span class="lbl">Код гри</span>
+      <div class="code" id="hCode"></div>
+      <div class="linkbox"><input type="text" id="hLink" readonly><button id="copyBtn">Копіювати</button></div>
+      <div id="qr"></div>
+      <div class="hint">ПІН для другого ведучого: <b id="hPin" class="me"></b></div>
+    </div>
+    <h2 style="margin-top:18px">Підключилися</h2>
+    <div class="count" id="hCount">0</div>
+    <div class="list" id="hLobbyList"></div>
+    <div class="btns"><button class="big full" id="startBtn" disabled>Почати гру</button></div>
+  </div>
+
+  <div class="card hide" id="vHost">
+    <div class="meta"><span id="hCounter"></span><span id="hCountry"></span></div>
+    <div class="photo q" id="photo"></div>
+    <div class="name" id="hName" style="font-size:28px">Що це? Для чого? Яка користь?</div>
+    <div class="list" id="hList"></div>
+    <div class="host" id="hPult">
+      <div class="hostTitle">👑 Пульт ведучого</div>
+      <div class="timer" id="hTimer"></div>
+      <div class="hint" id="hWait" style="margin-top:0"></div>
+      <div class="btns">
+        <button class="full hide" id="hEn" disabled></button>
+        <button class="big full" id="hReveal" disabled>✅ Показати відповідь</button>
+        <button class="full hide" id="hSkip">Не чекати решти</button>
+      </div>
+    </div>
+    <div class="answer hide" id="hAnswer">
+      <b>Правильна відповідь</b>
+      <div class="big-ok" id="hOk"></div>
+      <div class="expl" id="hExpl"></div>
+      <div class="btns">
+        <button id="hEn2" class="hide"></button>
+        <button id="hOk2" class="hide"></button>
+        <button class="big full" id="hNext">Наступний ➡</button>
+      </div>
+      <div class="hint">Галочка ставиться сама, якщо у відповіді є ключове слово. Ведучий вирішує остаточно: натисніть ✓, щоб поставити чи зняти бал.</div>
+    </div>
+  </div>
+
+  <div class="card hide" id="vScore">
+    <h2>Табло</h2>
+    <table id="scoreTbl"></table>
+    <div class="btns hide" id="hScoreBtns">
+      <button class="full" id="hRestart">Почати спочатку (рахунок з нуля)</button>
+      <button class="big full" id="hNewRoom">🆕 Нова гра - нове посилання</button>
+    </div>
+    <div class="hint hide" id="hNewRoomHint">Гравцям не треба нічого робити: їх автоматично перекине в нову гру. Старе посилання перестане працювати.</div>
+  </div>
+
+  <div class="card hide" id="vPhotos">
+    <h2>Своє фото (видно тільки на вашому екрані)</h2>
+    <div class="upl">
+      <label>📷 Фото цьому гравцю<input type="file" id="oneFile" accept="image/*"></label>
+      <label>📁 Пачкою (за назвою файлу)<input type="file" id="manyFiles" accept="image/*" multiple></label>
+    </div>
+    <div class="hint" id="msg"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const PLAYERS = [
+  { c:"", full:"Ламінування вій", e:"👁️", kw:["ламін","лемін","ламин"], what:"Склад, який фіксує вії в підкрученому стані і додає їм кольору та блиску.", why:"Щоб вії виглядали довшими і підкрученими без туші та щипців.", gain:"Ефект тримається 6-8 тижнів, зранку можна не фарбуватися." },
+  { c:"", full:"Мікроблейдинг брів", e:"✏️", kw:["мікробл","микробл","татуаж","тату"], what:"Ручний татуаж: пігмент вводять під шкіру тонкими штрихами, схожими на волоски.", why:"Щоб брови були густими і рівними без олівця.", gain:"Тримається 1-2 роки, брови не змиваються в басейні." },
+  { c:"", full:"Шугаринг", e:"🍯", kw:["шугар","цукр","депіляц","епіляц","паст"], what:"Видалення волосся густою цукровою пастою разом із корінцем.", why:"Щоб шкіра була гладкою довше, ніж після гоління.", gain:"Гладко 3-4 тижні, волосся з часом стає тоншим." },
+  { c:"", full:"Лазерна епіляція", e:"🔦", kw:["лазер"], what:"Лазер нагріває і руйнує волосяну цибулину.", why:"Щоб позбутися небажаного волосся надовго.", gain:"Після курсу з 6-10 сеансів волосся майже не росте." },
+  { c:"", full:"Нарощування вій", e:"🦋", kw:["нарощ","наращ"], what:"До кожної своєї вії приклеюють штучну.", why:"Для об'ємних і довгих вій без туші.", gain:"Виразний погляд одразу після сну, корекція раз на 2-3 тижні." },
+  { c:"", full:"Манікюр з гель-лаком", e:"💅", kw:["гель","шелак","манік","маник"], what:"Лак, який застигає під УФ-лампою.", why:"Щоб покриття нігтів не тріскалося і не облазило.", gain:"Тримається 2-3 тижні без сколів." },
+  { c:"", full:"Гідрогелеві патчі під очі", e:"🩹", kw:["патч"], what:"Гелеві підкладки з сироваткою, які кладуть під очі на 15-20 хвилин.", why:"Щоб прибрати набряки і темні кола.", gain:"Свіжий вигляд після короткого сну, ефект за 20 хвилин." },
+  { c:"", full:"Хімічний пілінг", e:"🧪", kw:["пілінг","пилинг","кислот"], what:"Кислоти розчиняють верхній шар відмерлих клітин шкіри.", why:"Щоб вирівняти тон і рельєф обличчя.", gain:"Менше пігментних плям і слідів від акне, шкіра гладкіша." },
+  { c:"", full:"Масаж гуаша", e:"🪨", kw:["гуаш","скреб","камін"], what:"Масаж обличчя плоским камінцем-скребком.", why:"Для відтоку лімфи і тонусу м'язів обличчя.", gain:"Менше набряків, чіткіший овал обличчя." },
+  { c:"", full:"Кератинове випрямлення волосся", e:"💇‍♀️", kw:["кератин"], what:"Волосся покривають складом з кератином і запечатують праскою.", why:"Щоб волосся було рівним і не пушилося.", gain:"Гладке слухняне волосся 3-5 місяців, швидше сохне." },
+  { c:"", full:"Біоревіталізація", e:"💉", kw:["біорев","биорев","гіалур","гиалур","мезо","укол"], what:"Уколи гіалуронової кислоти в шкіру.", why:"Щоб глибоко зволожити шкіру зсередини.", gain:"Шкіра пружніша, дрібних зморшок менше." },
+  { c:"", full:"LPG-масаж", e:"🌀", kw:["lpg","лпж","ролик","антицел","вакуум"], what:"Апаратний вакуумно-роликовий масаж тіла в спеціальному костюмі.", why:"Боротьба з целюлітом і набряками.", gain:"Шкіра рівніша і підтягнутіша, менше «апельсинової кірки»." }
+];
+
+const $ = id => document.getElementById(id);
+const VIEWS = ["vStart","vLoading","vOffline","vJoin","vWait","vCard","vLobby","vHost","vScore","vPhotos"];
+function show(...ids){ VIEWS.forEach(v => $(v).classList.toggle("hide", !ids.includes(v))); }
+function esc(s){ return String(s).replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch])); }
+function shuffle(a){ for(let k=a.length-1;k>0;k--){const j=Math.floor(Math.random()*(k+1));[a[k],a[j]]=[a[j],a[k]];} return a; }
+function rand(n, abc){ let s = ""; for (let k=0;k<n;k++) s += abc[Math.floor(Math.random()*abc.length)]; return s; }
+function connBadge(txt, bad){ const c = $("conn"); c.textContent = txt; c.classList.toggle("hide", !txt); c.classList.toggle("bad", !!bad); }
+
+// ---------- голоси ----------
+const synth = window.speechSynthesis;
+let voices = [];
+function loadVoices(){ voices = synth ? synth.getVoices() : []; }
+if (synth) { loadVoices(); synth.onvoiceschanged = loadVoices; }
+function pickVoice(lang){ const alt = { no:["nb","nn","no"] }[lang] || [lang]; return voices.find(v => alt.some(a => v.lang.toLowerCase().startsWith(a))); }
+function enVoice(){ return voices.find(v => /^en-gb/i.test(v.lang)) || voices.find(v => /^en/i.test(v.lang)); }
+function speak(text, voice, lang, rate){
+  if (!synth) return;
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = lang;
+  u.rate = rate; synth.speak(u);
+}
+
+function sentThisRound(){ return myGuessRound === S.round && !!myGuess; }
+// ---------- таймер: 30 секунд на відповідь ----------
+const ROUND_SEC = 30;
+let deadlineLocal = 0, deadlineKey = null, upRendered = null;
+function syncDeadline(){
+  if (S.phase === "play" && !S.revealed && S.deadline) {
+    const key = S.round + ":" + S.deadline;
+    if (key !== deadlineKey) { deadlineKey = key; deadlineLocal = Date.now() + (S.deadline - (S.now || Date.now())); }
+  } else { deadlineKey = null; deadlineLocal = 0; }
+}
+function timeLeft(){ return deadlineLocal ? Math.max(0, Math.ceil((deadlineLocal - Date.now()) / 1000)) : null; }
+function timeUp(){ return !!deadlineLocal && Date.now() >= deadlineLocal; }
+setInterval(() => {
+  syncDeadline();
+  const t = timeLeft();
+  ["pTimer","hTimer"].forEach(id => { const el = $(id); if (!el) return; el.textContent = t === null ? "" : (t > 0 ? "⏱ " + t : "⏱ Час вийшов"); el.classList.toggle("low", t !== null && t <= 5); });
+  if (timeUp()) {
+    if (!isAdmin && !$("myGuess").disabled) {
+      if ($("myGuess").value.trim() && !sentThisRound()) $("sendBtn").click();
+      $("myGuess").disabled = true; $("sendBtn").disabled = true;
+      if (!sentThisRound()) $("sentTxt").textContent = "Час вийшов, відповідь не надіслана.";
+    }
+    if (isAdmin && upRendered !== deadlineKey) { upRendered = deadlineKey; render(); }
+  }
+}, 250);
+
+function sayEn(p){}
+function sayOk(p){}
+function unlockAudio(){ if (synth) { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; synth.speak(u); } }
+
+// ---------- звірка відповіді ----------
+function clean(s){ return s.toLowerCase().replace(/ё/g,"е").replace(/ґ/g,"г").replace(/ы/g,"и").replace(/[^а-яіїєa-z]/g,""); }
+function lev(a,b){
+  const d = Array.from({length:a.length+1}, (_,x) => [x]);
+  for (let y=1;y<=b.length;y++) d[0][y]=y;
+  for (let x=1;x<=a.length;x++) for (let y=1;y<=b.length;y++)
+    d[x][y] = Math.min(d[x-1][y]+1, d[x][y-1]+1, d[x-1][y-1]+(a[x-1]===b[y-1]?0:1));
+  return d[a.length][b.length];
+}
+function hasKw(g, p){ const t = g.toLowerCase().replace(/ё/g,"е"); return (p.kw || []).some(k => t.includes(k)); }
+function isClose(g, right){
+  const a = clean(g), b = clean(right); if (!a) return false;
+  const last = clean(right.split(" ").pop());
+  return 1 - lev(a,b)/Math.max(a.length,b.length) >= 0.8 || 1 - lev(a,last)/Math.max(a.length,last.length) >= 0.85;
+}
+
+// ---------- зв'язок через публічний MQTT-сервер ----------
+// Усі (ведучий і гравці) підключаються до одного сервера повідомлень, тож мережа гравця не важлива.
+const BROKERS = ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt"];
+const NS = "shchotsebulo/v1/";
+const myId = (() => { let id = ""; try { id = sessionStorage.getItem("slomay_id") || ""; } catch(e) {} if (!id) { id = rand(10, "abcdefghijkmnpqrstuvwxyz23456789"); try { sessionStorage.setItem("slomay_id", id); } catch(e) {} } return id; })();
+let client = null, code = "", pin = "";
+const T = { state:()=>NS+code+"/state", pres:id=>NS+code+"/p/"+id, presAll:()=>NS+code+"/p/+", cmd:()=>NS+code+"/cmd", say:()=>NS+code+"/say" };
+
+function connect(onReady, brokerIdx){
+  brokerIdx = brokerIdx || 0;
+  if (typeof mqtt === "undefined") { fail("Не завантажилася бібліотека зв'язку. Перевірте інтернет і оновіть сторінку."); return; }
+  const opts = { clientId:"zl_" + myId + "_" + rand(4,"abcdef0123"), keepalive:20, reconnectPeriod:2000, connectTimeout:8000, clean:true };
+  if (mode === "player") opts.will = { topic:T.pres(myId), payload:"", retain:true, qos:1 };
+  const c = mqtt.connect(BROKERS[brokerIdx], opts);
+  let ready = false;
+  const giveUp = setTimeout(() => { if (!ready) { c.end(true); if (brokerIdx + 1 < BROKERS.length) connect(onReady, brokerIdx + 1); else fail("Не вдалося підключитися до сервера гри. Спробуйте іншу мережу (наприклад, мобільний інтернет)."); } }, 9000);
+  c.on("connect", () => {
+    connBadge("");
+    if (!ready) { ready = true; clearTimeout(giveUp); client = c; onReady(); }
+    else { resubscribe(); if (mode !== "main") publishMe(); }
+  });
+  c.on("reconnect", () => { if (ready) connBadge("Відновлюємо зв'язок…", true); });
+  c.on("offline", () => { if (ready) connBadge("Немає зв'язку…", true); });
+  c.on("message", (topic, buf) => {
+    let d = null; const txt = buf.toString();
+    if (txt) { try { d = JSON.parse(txt); } catch(e) { return; } }
+    onMessage(topic, d);
+  });
+}
+function fail(msg){ $("offTxt").textContent = msg; show("vOffline"); }
+function pub(topic, obj, retain){ if (client) client.publish(topic, obj === null ? "" : JSON.stringify(obj), { qos:1, retain:!!retain }); }
+let subs = [];
+function sub(list){ subs = list; resubscribe(); }
+function resubscribe(){ if (client && subs.length) client.subscribe(subs, { qos:1 }); }
+
+// ---------- ролі і стан ----------
+// mode: "main" - головний ведучий (тримає гру), "co" - другий ведучий, "player"
+let mode = null, isAdmin = false;
+let S = { phase:"lobby", roster:[], admins:[] };
+let lastRoundSeen = null;
+let myName = ""; try { myName = localStorage.getItem("slomay_name") || ""; } catch(e) {}
+function card(){ return S.phase === "play" ? PLAYERS[S.order[S.pos]] : null; }
+function roster(){ return S.roster || []; }
+
+// ================= ГОЛОВНИЙ ВЕДУЧИЙ =================
+const pres = new Map(); // clientId -> {name, guess, round, role, pin}
+let resumed = false;
+
+function startMain(){
+  mode = "main"; isAdmin = true;
+  try { code = sessionStorage.getItem("slomay_code") || ""; pin = sessionStorage.getItem("slomay_pin") || ""; } catch(e) {}
+  if (!code) code = rand(5, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789");
+  if (!pin) pin = rand(4, "0123456789");
+  try { sessionStorage.setItem("slomay_code", code); sessionStorage.setItem("slomay_pin", pin); sessionStorage.setItem("slomay_main", "1"); } catch(e) {}
+  $("loadTxt").textContent = "Відкриваємо стадіон…"; show("vLoading");
+  connect(() => {
+    const url = location.origin + location.pathname + "?game=" + code;
+    $("hCode").textContent = code; $("hLink").value = url; $("hPin").textContent = pin;
+    $("qr").innerHTML = ""; try { new QRCode($("qr"), { text:url, width:160, height:160 }); } catch(e) {}
+    sub([T.state(), T.presAll(), T.cmd(), T.say()]);
+    // якщо за 1.5 с не прийшов збережений стан цієї гри - починаємо з лобі
+    setTimeout(() => { if (!resumed) { resumed = true; commit({ phase:"lobby", scores:{}, answers:[], revealed:false, skip:false }); } }, 1500);
+    render();
+  });
+}
+function livePlayers(){
+  const seen = new Set(), out = [];
+  pres.forEach(p => {
+    if (p.role !== "player" || !p.name) return;
+    const k = p.name.toLowerCase(); if (seen.has(k)) return; seen.add(k);
+    out.push({ name:p.name, guess: p.round === S.round && typeof p.guess === "string" ? p.guess : "" });
+  });
+  return out;
+}
+function admins(){ const a = []; pres.forEach((p,id) => { if (p.role === "co" && String(p.pin) === pin) a.push(id); }); return a; }
+function updateRoster(){ S.roster = livePlayers().map(p => ({ name:p.name, answered:!!p.guess.trim() })); S.admins = admins(); }
+let pubTimer = null;
+function publishState(){ clearTimeout(pubTimer); pubTimer = setTimeout(() => { S.now = Date.now(); pub(T.state(), S, true); }, 60); }
+function commit(patch){ Object.assign(S, patch, { by:myId }); updateRoster(); render(); publishState(); }
+
+function newOrder(){ return shuffle(PLAYERS.map((_,k) => k)); }
+function doCmd(cmd, arg){
+  const p = card();
+  if (cmd === "start") { commit({ phase:"play", order:newOrder(), pos:0, round:(S.round||0)+1, revealed:false, answers:[], skip:false, scores:S.scores || {}, deadline:Date.now()+ROUND_SEC*1000 }); }
+  else if (cmd === "skip") { commit({ skip:true }); }
+  else if (cmd === "en" && p) { pub(T.say(), { kind:"en", round:S.round, n:Date.now() }); }
+  else if (cmd === "ok" && p) { pub(T.say(), { kind:"ok", round:S.round, n:Date.now() }); }
+  else if (cmd === "reveal" && p && !S.revealed) {
+    const answers = livePlayers().filter(x => x.guess.trim()).map(x => ({ name:x.name, guess:x.guess, ok:hasKw(x.guess, p) }));
+    commit({ revealed:true, answers }); pub(T.say(), { kind:"ok", round:S.round, n:Date.now() });
+  }
+  else if (cmd === "toggle" && S.revealed) {
+    const k = +arg; commit({ answers: S.answers.map((a,i) => i === k ? Object.assign({}, a, { ok:!a.ok }) : a) });
+  }
+  else if (cmd === "next" && S.phase === "play") {
+    const scores = Object.assign({}, S.scores || {});
+    (S.answers || []).forEach(a => { if (a.ok) scores[a.name] = (scores[a.name] || 0) + 1; });
+    let pos = S.pos + 1, order = S.order;
+    if (pos >= order.length) { order = newOrder(); pos = 0; }
+    if (synth) synth.cancel();
+    commit({ pos, order, round:S.round + 1, revealed:false, answers:[], skip:false, scores, deadline:Date.now()+ROUND_SEC*1000 });
+  }
+  else if (cmd === "restart") { commit({ phase:"lobby", scores:{}, answers:[], revealed:false, skip:false }); }
+}
+
+// ================= ГРАВЕЦЬ / ДРУГИЙ ВЕДУЧИЙ =================
+let joined = false, myGuess = "", myGuessRound = null, wantCo = false, coPin = "", gotState = false;
+function startGuest(gameCode){
+  mode = "player"; code = gameCode;
+  connect(() => {
+    sub([T.state(), T.say()]);
+    publishMe();
+    setTimeout(() => { if (!gotState) connBadge("Гру " + code + " не знайдено або ведучий ще не відкрив її", true); }, 4000);
+    render();
+  });
+}
+function publishMe(){
+  if (!client) return;
+  if (wantCo && coPin) pub(T.pres(myId), { role:"co", pin:coPin }, true);
+  else if (joined) pub(T.pres(myId), { role:"player", name:myName, guess:myGuess, round:myGuessRound }, true);
+}
+function act(cmd, arg){
+  if (mode === "main") doCmd(cmd, arg);
+  else pub(T.cmd(), { from:myId, pin:coPin, cmd, arg });
+}
+
+// ---------- вхідні повідомлення ----------
+let lastSay = 0;
+function onMessage(topic, d){
+  if (topic === T.state()) {
+    if (!d) return;
+    if (mode === "main") {
+      // збережений стан цієї гри (наприклад, після перезавантаження ведучого) - продовжуємо з нього
+      if (!resumed) { resumed = true; if (d.by === myId || d.phase) { S = Object.assign({ roster:[], admins:[] }, d); delete S.moved; updateRoster(); render(); publishState(); } }
+      return;
+    }
+    gotState = true; connBadge("");
+    if (d.moved && /^[A-Z0-9]{5}$/.test(d.moved) && d.moved !== code) {
+      connBadge("Ведучий створив нову гру, переходимо…");
+      try { sessionStorage.setItem("slomay_auto", JSON.stringify({ name: joined ? myName : "", pin: wantCo ? coPin : "" })); } catch(e) {}
+      setTimeout(() => { location.href = location.pathname + "?game=" + d.moved; }, 1200);
+      return;
+    }
+    S = d;
+    const amAdmin = wantCo && (S.admins || []).includes(myId);
+    if (wantCo && !amAdmin && !isAdmin) $("pinMsg").textContent = "Перевіряємо… Якщо довго - перевірте ПІН.";
+    if (amAdmin) { mode = "co"; isAdmin = true; } 
+    render();
+  }
+  else if (topic === T.say()) {
+    if (!d || d.round !== S.round || d.n === lastSay) return; lastSay = d.n;
+    const p = card(); if (!p) return;
+    (d.kind === "en" ? sayEn : sayOk)(p);
+  }
+  else if (mode === "main" && topic.startsWith(NS + code + "/p/")) {
+    const id = topic.slice((NS + code + "/p/").length);
+    const old = pres.get(id);
+    if (d && old && d.round === S.round && S.deadline && Date.now() > S.deadline + 3000 && d.guess !== old.guess) d = Object.assign({}, d, { guess:old.guess });
+    if (!d) pres.delete(id); else pres.set(id, { name:String(d.name||"").trim().slice(0,20), guess:String(d.guess||"").slice(0,120), round:d.round, role:d.role, pin:d.pin });
+    updateRoster(); render(); publishState();
+  }
+  else if (mode === "main" && topic === T.cmd()) {
+    if (!d || String(d.pin) !== pin) return;
+    doCmd(d.cmd, d.arg);
+  }
+}
+
+// ---------- відмальовка ----------
+function render(){
+  if (isAdmin) renderAdmin(); else renderPlayer();
+  renderScore();
+}
+function renderPlayer(){
+  if (!joined) { if (!wantCo) { show("vJoin"); if (!$("myName").value) $("myName").value = myName; } return; }
+  if (S.phase !== "play") { show("vWait"); $("waitName").textContent = myName; $("waitCount").textContent = roster().length; return; }
+  show("vCard","vScore");
+  const p = card();
+  $("pCounter").textContent = (S.pos+1) + " / " + S.order.length;
+  $("pCountry").textContent = p.c;
+  setQ($("pQ"), p);
+  if (!S.revealed) {
+    $("pAsk").classList.remove("hide"); $("pAnswer").classList.add("hide");
+    if (lastRoundSeen !== S.round) { lastRoundSeen = S.round; $("myGuess").value = ""; $("sentTxt").textContent = ""; $("myGuess").disabled = false; $("sendBtn").disabled = false; }
+  } else {
+    $("pAsk").classList.add("hide"); $("pAnswer").classList.remove("hide");
+    $("pOk").textContent = p.full;
+    $("pExpl").innerHTML = explain(p);
+    $("pList").innerHTML = (S.answers || []).map(a =>
+      `<div class="li"><div><span class="${a.name.toLowerCase()===myName.toLowerCase()?"me":""}">${esc(a.name)}</span><div class="g">${esc(a.guess || "-")}</div></div><span class="tag ${a.ok?"yes":""}">${a.ok?"✓ зараховано":"повз"}</span></div>`).join("");
+  }
+}
+function renderAdmin(){
+  const ps = roster();
+  $("inviteBox").classList.toggle("hide", mode !== "main");
+  if (S.phase !== "play") {
+    show("vLobby","vScore");
+    $("hScoreBtns").classList.toggle("hide", mode !== "main");
+    $("hRestart").classList.add("hide");
+    $("hNewRoom").classList.toggle("hide", mode !== "main");
+    $("hNewRoomHint").classList.toggle("hide", mode !== "main");
+    $("hCount").textContent = ps.length;
+    $("hLobbyList").innerHTML = ps.map(p => `<div class="li"><span>${esc(p.name)}</span><span class="tag yes">у грі</span></div>`).join("") || '<div class="hint">Поки нікого.</div>';
+    $("startBtn").disabled = ps.length === 0;
+    return;
+  }
+  show("vHost","vScore","vPhotos");
+  $("hScoreBtns").classList.remove("hide");
+  $("hRestart").classList.remove("hide");
+  $("hNewRoom").classList.toggle("hide", mode !== "main");
+  $("hNewRoomHint").classList.toggle("hide", mode !== "main");
+  const p = card();
+  $("hCounter").textContent = (S.pos+1) + " / " + S.order.length;
+  $("hCountry").textContent = p.c;
+  setQ($("photo"), p);
+  if (!S.revealed) {
+    $("hPult").classList.remove("hide"); $("hAnswer").classList.add("hide");
+    const answered = ps.filter(x => x.answered).length, left = ps.length - answered;
+    $("hList").innerHTML = ps.map(x => `<div class="li"><span>${esc(x.name)}</span><span class="tag ${x.answered?"yes":""}">${x.answered?"відповів":"думає…"}</span></div>`).join("") || '<div class="hint">Гравців немає.</div>';
+    const ready = (ps.length > 0 && left === 0) || S.skip || timeUp();
+    $("hEn").disabled = $("hReveal").disabled = !ready;
+    $("hSkip").classList.toggle("hide", ready || answered === 0);
+    $("hWait").textContent = ready ? "Відповіді зібрано. Можна відкривати правильну відповідь." : `Чекаємо відповіді: ${answered} з ${ps.length}.`;
+  } else {
+    $("hPult").classList.add("hide"); $("hAnswer").classList.remove("hide");
+    $("hOk").textContent = p.full;
+    $("hExpl").innerHTML = explain(p);
+    $("hList").innerHTML = (S.answers || []).map((a,k) =>
+      `<div class="li"><div>${esc(a.name)}<div class="g">${esc(a.guess || "-")}</div></div><button class="mark ${a.ok?"on":""}" data-k="${k}">✓</button></div>`).join("") || '<div class="hint">Відповідей немає.</div>';
+  }
+}
+function renderScore(){
+  const sc = Object.assign({}, S.scores || {});
+  if (S.revealed) (S.answers || []).forEach(a => { if (a.ok) sc[a.name] = (sc[a.name] || 0) + 1; });
+  const rows = Object.entries(sc).sort((a,b) => b[1]-a[1]);
+  $("scoreTbl").innerHTML = rows.map(([n,v]) => `<tr><td class="${!isAdmin && n.toLowerCase()===myName.toLowerCase()?"me":""}">${esc(n)}</td><td>${v}</td></tr>`).join("") || '<tr><td class="hint">Поки порожньо</td><td></td></tr>';
+}
+
+// ---------- кнопки ----------
+$("createBtn").onclick = () => { unlockAudio(); startMain(); };
+$("codeBtn").onclick = () => { const c = $("codeIn").value.trim().toUpperCase(); if (c.length === 5) location.href = location.pathname + "?game=" + c; };
+$("codeIn").onkeydown = e => { if (e.key === "Enter") $("codeBtn").click(); };
+$("copyBtn").onclick = () => {
+  const t = $("hLink").value;
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(
+    () => { $("copyBtn").textContent = "Скопійовано"; setTimeout(() => $("copyBtn").textContent = "Копіювати", 1500); },
+    () => { $("hLink").select(); });
+};
+$("joinBtn").onclick = () => {
+  const n = $("myName").value.trim().slice(0,20); if (!n) return;
+  myName = n; joined = true; try { localStorage.setItem("slomay_name", n); } catch(e) {}
+  unlockAudio(); publishMe(); render();
+};
+$("myName").onkeydown = e => { if (e.key === "Enter") $("joinBtn").click(); };
+$("coLink").onclick = e => { e.preventDefault(); $("coBox").classList.toggle("hide"); };
+$("pinBtn").onclick = () => {
+  coPin = $("pinIn").value.trim(); if (!coPin) return;
+  wantCo = true; unlockAudio(); $("pinMsg").textContent = "Перевіряємо…"; publishMe();
+};
+$("sendBtn").onclick = () => {
+  const g = $("myGuess").value.trim().slice(0,120); if (!g) return;
+  myGuess = g; myGuessRound = S.round; publishMe();
+  $("sentTxt").textContent = "Відповідь надіслано. Можна виправити, поки ведучий не відкрив правильний варіант.";
+};
+$("myGuess").onkeydown = e => { if (e.key === "Enter") $("sendBtn").click(); };
+$("pEn").onclick = () => { const p = card(); if (p) sayEn(p); };
+$("pOkBtn").onclick = () => { const p = card(); if (p) sayOk(p); };
+
+$("startBtn").onclick = () => act("start");
+$("hSkip").onclick = () => act("skip");
+$("hEn").onclick = () => act("en");
+$("hEn2").onclick = () => act("en");
+$("hReveal").onclick = () => act("reveal");
+$("hOk2").onclick = () => act("ok");
+$("hNext").onclick = () => act("next");
+$("hRestart").onclick = () => act("restart");
+$("hList").onclick = e => { const k = e.target.dataset.k; if (k !== undefined) act("toggle", +k); };
+$("hNewRoom").onclick = () => {
+  if (mode !== "main") return;
+  const newCode = rand(5, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789");
+  pub(T.state(), Object.assign({}, S, { moved:newCode }), true); // гравців перекине автоматично
+  try { sessionStorage.setItem("slomay_code", newCode); } catch(e) {} // ПІН лишається той самий
+  $("hNewRoom").disabled = true; $("hNewRoom").textContent = "Створюємо нову гру…";
+  setTimeout(() => { try { client.end(); } catch(e) {} location.href = location.pathname + "?game=" + newCode; }, 900);
+};
+window.addEventListener("pagehide", () => { if (mode === "player" && client) { try { client.publish(T.pres(myId), "", { qos:0, retain:true }); } catch(e) {} } });
+
+// ---------- фото (тільки на своєму екрані) ----------
+const photos = {};
+function norm(s){
+  return s.toLowerCase().replace(/[øö]/g,"o").replace(/ð/g,"d").replace(/ł/g,"l").replace(/ı/g,"i").replace(/æ/g,"ae")
+    .normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]/g,"");
+}
+function surnameKey(p){ return norm(p.full.trim().split(" ").pop().split("-")[0]); }
+function setQ(box, p){
+  const url = photos[p.full] || p.photo;
+  if (url) { box.innerHTML = '<img alt="">'; box.firstChild.src = url; } else box.textContent = p.e || "❓";
+}
+function explain(p){
+  return `<div><b>Що це:</b> ${esc(p.what)}</div><div><b>Для чого:</b> ${esc(p.why)}</div><div><b>Користь:</b> ${esc(p.gain)}</div>`;
+}
+function showPhoto(){ const p0 = card(); if (p0) setQ($("photo"), p0); return;
+  const box = $("photo"), p = card(), url = p && (photos[p.full] || p.photo);
+  if (S.revealed && url) { box.style.display = "block"; box.innerHTML = '<img alt="">'; box.firstChild.src = url; }
+  else { box.style.display = "none"; box.innerHTML = ""; }
+}
+$("oneFile").onchange = e => {
+  const f = e.target.files[0], p = card(); if (!f || !p) return;
+  photos[p.full] = URL.createObjectURL(f); $("msg").textContent = "Фото додано: " + p.full; showPhoto(); e.target.value = "";
+};
+$("manyFiles").onchange = e => {
+  let hit = 0; const miss = [];
+  [...e.target.files].forEach(f => {
+    const fn = norm(f.name.replace(/\.[^.]+$/, ""));
+    const p = PLAYERS.find(p => fn.includes(surnameKey(p)));
+    if (p) { photos[p.full] = URL.createObjectURL(f); hit++; } else miss.push(f.name);
+  });
+  $("msg").textContent = "Зіставлено: " + hit + (miss.length ? ". Не впізнав: " + miss.join(", ") : "");
+  showPhoto(); e.target.value = "";
+};
+
+// ---------- старт ----------
+(function boot(){
+  const g = (new URLSearchParams(location.search).get("game") || "").toUpperCase().replace(/[^A-Z0-9]/g,"");
+  let wasMain = false, storedCode = ""; try { wasMain = sessionStorage.getItem("slomay_main") === "1"; storedCode = sessionStorage.getItem("slomay_code") || ""; } catch(e) {}
+  if (g && !(wasMain && storedCode === g)) {
+    show("vJoin"); $("myName").value = myName;
+    let auto = null; try { auto = JSON.parse(sessionStorage.getItem("slomay_auto") || "null"); sessionStorage.removeItem("slomay_auto"); } catch(e) {}
+    if (auto && auto.pin) { wantCo = true; coPin = String(auto.pin); $("coBox").classList.remove("hide"); $("pinIn").value = coPin; $("pinMsg").textContent = "Перевіряємо…"; }
+    else if (auto && auto.name) { myName = auto.name; joined = true; show("vWait"); $("waitName").textContent = myName; }
+    startGuest(g);
+  }
+  else if (wasMain) startMain();
+  else show("vStart");
+})();
+</script>
+</body>
+</html>
