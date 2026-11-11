@@ -58,8 +58,8 @@
   .hostTitle { font-size:12px; color:var(--acc); font-weight:800; margin-bottom:6px; text-transform:uppercase; letter-spacing:1.5px; }
   #vLobby .hostTitle, #vHost > .hostTitle { margin-bottom:10px; }
   .count { font-family:"Bebas Neue",Impact,sans-serif; font-size:72px; line-height:1; color:var(--acc); }
-  .photo { width:100%; aspect-ratio:4/3; border-radius:14px; overflow:hidden; margin-bottom:14px; display:none; border:2px solid var(--chalk); }
-  .photo img { width:100%; height:100%; object-fit:cover; display:block; }
+  .photo { width:100%; height:340px; border-radius:14px; overflow:hidden; margin-bottom:14px; display:none; border:2px solid var(--chalk); background:#f4f7f2; }
+  .photo img { width:100%; height:100%; object-fit:contain; display:block; }
   .upl { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .upl label { font-size:13px; padding:12px; border-radius:12px; border:2px dashed var(--line); text-align:center; cursor:pointer; color:var(--mut); }
   .upl label:hover { color:var(--txt); border-color:var(--chalk); }
@@ -219,7 +219,7 @@
 <script>
 const PLAYERS = [
   { full:"Wojciech Szczęsny", photo:"img/szczesny-2.jpg", en:"Wojciech Szczesny", lang:"pl", native:"Wojciech Szczęsny", ru:"Войцех Щенсний", c:"🇵🇱 Польща" },
-  { full:"Jakub Błaszczykowski", en:"Jakub Blaszczykowski", lang:"pl", native:"Jakub Błaszczykowski", ru:"Якуб Блащиковський", c:"🇵🇱 Польща" },
+  { full:"Jakub Błaszczykowski", photo:"img/blaszczykowski.jpg", en:"Jakub Blaszczykowski", lang:"pl", native:"Jakub Błaszczykowski", ru:"Якуб Блащиковський", c:"🇵🇱 Польща" },
   { full:"Grzegorz Krychowiak", en:"Grzegorz Krychowiak", lang:"pl", native:"Grzegorz Krychowiak", ru:"Гжегож Крихов'як", c:"🇵🇱 Польща" },
   { full:"Szymon Żurkowski", en:"Szymon Zurkowski", lang:"pl", native:"Szymon Żurkowski", ru:"Шимон Журковський", c:"🇵🇱 Польща" },
   { full:"Khvicha Kvaratskhelia", en:"Khvicha Kvaratskhelia", lang:"ka", native:"ხვიჩა კვარაცხელია", ru:"Хвіча Кварацхелія", c:"🇬🇪 Грузія" },
