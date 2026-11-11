@@ -144,6 +144,7 @@
       <div class="hint" id="sentTxt"></div>
     </div>
     <div class="answer hide" id="pAnswer">
+      <div class="photo" id="pPhoto"></div>
       <b>Правильно українською</b>
       <div class="big-ok" id="pOk"></div>
       <div class="btns"><button id="pEn">🔊 Як читає англієць</button><button id="pOkBtn">🔊 Як правильно</button></div>
@@ -226,7 +227,7 @@ const PLAYERS = [
   { full:"Jóhann Berg Guðmundsson", en:"Johann Berg Gudmundsson", lang:"is", native:"Jóhann Berg Guðmundsson", ru:"Йоуган Берг Гвюдмюндсон", c:"🇮🇸 Ісландія" },
   { full:"Granit Xhaka", en:"Granit Xhaka", lang:"sq", native:"Granit Xhaka", ru:"Граніт Джака", c:"🇨🇭 Швейцарія" },
   { full:"Sokratis Papastathopoulos", en:"Sokratis Papastathopoulos", lang:"el", native:"Σωκράτης Παπασταθόπουλος", ru:"Сократіс Папастатопулос", c:"🇬🇷 Греція" },
-  { full:"Martin Ødegaard", en:"Martin Odegaard", lang:"no", native:"Martin Ødegaard", ru:"Мартін Едегор", c:"🇳🇴 Норвегія" },
+  { full:"Martin Ødegaard", photo:"img/odegaard.jpg", en:"Martin Odegaard", lang:"no", native:"Martin Ødegaard", ru:"Мартін Едегор", c:"🇳🇴 Норвегія" },
   { full:"Rasmus Højlund", en:"Rasmus Hojlund", lang:"da", native:"Rasmus Højlund", ru:"Расмус Гойлунн", c:"🇩🇰 Данія" },
   { full:"Wout Weghorst", en:"Wout Weghorst", lang:"nl", native:"Wout Weghorst", ru:"Ваут Вехорст", c:"🇳🇱 Нідерланди" },
   { full:"Ruud van Nistelrooy", en:"Ruud van Nistelrooy", lang:"nl", native:"Ruud van Nistelrooij", ru:"Рюд ван Ністелрой", c:"🇳🇱 Нідерланди" },
@@ -467,6 +468,8 @@ function renderPlayer(){
   } else {
     $("pAsk").classList.add("hide"); $("pAnswer").classList.remove("hide");
     $("pOk").textContent = p.ru;
+    const pp = $("pPhoto"), purl = photos[p.full] || p.photo;
+    if (purl) { pp.style.display = "block"; pp.innerHTML = '<img alt="">'; pp.firstChild.src = purl; } else { pp.style.display = "none"; pp.innerHTML = ""; }
     $("pList").innerHTML = (S.answers || []).map(a =>
       `<div class="li"><div><span class="${a.name.toLowerCase()===myName.toLowerCase()?"me":""}">${esc(a.name)}</span><div class="g">${esc(a.guess || "-")}</div></div><span class="tag ${a.ok?"yes":""}">${a.ok?"✓ зараховано":"повз"}</span></div>`).join("");
   }
@@ -574,7 +577,7 @@ function norm(s){
 }
 function surnameKey(p){ return norm(p.full.trim().split(" ").pop().split("-")[0]); }
 function showPhoto(){
-  const box = $("photo"), p = card(), url = p && photos[p.full];
+  const box = $("photo"), p = card(), url = p && (photos[p.full] || p.photo);
   if (S.revealed && url) { box.style.display = "block"; box.innerHTML = '<img alt="">'; box.firstChild.src = url; }
   else { box.style.display = "none"; box.innerHTML = ""; }
 }
