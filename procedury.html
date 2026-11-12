@@ -315,7 +315,7 @@ function isClose(g, right){
 // Усі (ведучий і гравці) підключаються до одного сервера повідомлень, тож мережа гравця не важлива.
 const BROKERS = ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt"];
 const NS = "shchotsebulo/v1/";
-const myId = (() => { let id = ""; try { id = sessionStorage.getItem("slomay_id") || ""; } catch(e) {} if (!id) { id = rand(10, "abcdefghijkmnpqrstuvwxyz23456789"); try { sessionStorage.setItem("slomay_id", id); } catch(e) {} } return id; })();
+const myId = (() => { let id = ""; try { id = sessionStorage.getItem("proc_id") || ""; } catch(e) {} if (!id) { id = rand(10, "abcdefghijkmnpqrstuvwxyz23456789"); try { sessionStorage.setItem("proc_id", id); } catch(e) {} } return id; })();
 let client = null, code = "", pin = "";
 const T = { state:()=>NS+code+"/state", pres:id=>NS+code+"/p/"+id, presAll:()=>NS+code+"/p/+", cmd:()=>NS+code+"/cmd", say:()=>NS+code+"/say" };
 
@@ -361,10 +361,10 @@ let resumed = false;
 
 function startMain(){
   mode = "main"; isAdmin = true;
-  try { code = sessionStorage.getItem("slomay_code") || ""; pin = sessionStorage.getItem("slomay_pin") || ""; } catch(e) {}
+  try { code = sessionStorage.getItem("proc_code") || ""; pin = sessionStorage.getItem("proc_pin") || ""; } catch(e) {}
   if (!code) code = rand(5, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789");
   if (!pin) pin = rand(4, "0123456789");
-  try { sessionStorage.setItem("slomay_code", code); sessionStorage.setItem("slomay_pin", pin); sessionStorage.setItem("slomay_main", "1"); } catch(e) {}
+  try { sessionStorage.setItem("proc_code", code); sessionStorage.setItem("proc_pin", pin); sessionStorage.setItem("proc_main", "1"); } catch(e) {}
   $("loadTxt").textContent = "Відкриваємо стадіон…"; show("vLoading");
   connect(() => {
     const url = location.origin + location.pathname + "?game=" + code;
@@ -450,7 +450,7 @@ function onMessage(topic, d){
     gotState = true; connBadge("");
     if (d.moved && /^[A-Z0-9]{5}$/.test(d.moved) && d.moved !== code) {
       connBadge("Ведучий створив нову гру, переходимо…");
-      try { sessionStorage.setItem("slomay_auto", JSON.stringify({ name: joined ? myName : "", pin: wantCo ? coPin : "" })); } catch(e) {}
+      try { sessionStorage.setItem("proc_auto", JSON.stringify({ name: joined ? myName : "", pin: wantCo ? coPin : "" })); } catch(e) {}
       setTimeout(() => { location.href = location.pathname + "?game=" + d.moved; }, 1200);
       return;
     }
@@ -591,7 +591,7 @@ $("hNewRoom").onclick = () => {
   if (mode !== "main") return;
   const newCode = rand(5, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789");
   pub(T.state(), Object.assign({}, S, { moved:newCode }), true); // гравців перекине автоматично
-  try { sessionStorage.setItem("slomay_code", newCode); } catch(e) {} // ПІН лишається той самий
+  try { sessionStorage.setItem("proc_code", newCode); } catch(e) {} // ПІН лишається той самий
   $("hNewRoom").disabled = true; $("hNewRoom").textContent = "Створюємо нову гру…";
   setTimeout(() => { try { client.end(); } catch(e) {} location.href = location.pathname + "?game=" + newCode; }, 900);
 };
@@ -634,10 +634,10 @@ $("manyFiles").onchange = e => {
 // ---------- старт ----------
 (function boot(){
   const g = (new URLSearchParams(location.search).get("game") || "").toUpperCase().replace(/[^A-Z0-9]/g,"");
-  let wasMain = false, storedCode = ""; try { wasMain = sessionStorage.getItem("slomay_main") === "1"; storedCode = sessionStorage.getItem("slomay_code") || ""; } catch(e) {}
+  let wasMain = false, storedCode = ""; try { wasMain = sessionStorage.getItem("proc_main") === "1"; storedCode = sessionStorage.getItem("proc_code") || ""; } catch(e) {}
   if (g && !(wasMain && storedCode === g)) {
     show("vJoin"); $("myName").value = myName;
-    let auto = null; try { auto = JSON.parse(sessionStorage.getItem("slomay_auto") || "null"); sessionStorage.removeItem("slomay_auto"); } catch(e) {}
+    let auto = null; try { auto = JSON.parse(sessionStorage.getItem("proc_auto") || "null"); sessionStorage.removeItem("proc_auto"); } catch(e) {}
     if (auto && auto.pin) { wantCo = true; coPin = String(auto.pin); $("coBox").classList.remove("hide"); $("pinIn").value = coPin; $("pinMsg").textContent = "Перевіряємо…"; }
     else if (auto && auto.name) { myName = auto.name; joined = true; show("vWait"); $("waitName").textContent = myName; }
     startGuest(g);
