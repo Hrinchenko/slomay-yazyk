@@ -389,7 +389,7 @@ function admins(){ const a = []; pres.forEach((p,id) => { if (p.role === "co" &&
 function updateRoster(){ S.roster = livePlayers().map(p => ({ name:p.name, answered:!!p.guess.trim() })); S.admins = admins(); }
 let pubTimer = null;
 function publishState(){ clearTimeout(pubTimer); pubTimer = setTimeout(() => { S.now = Date.now(); pub(T.state(), S, true); }, 60); }
-function commit(patch){ Object.assign(S, patch, { by:myId }); updateRoster(); render(); publishState(); }
+function commit(patch){ Object.assign(S, patch, { by:myId, now:Date.now() }); updateRoster(); render(); publishState(); }
 
 function newOrder(){ return shuffle(PLAYERS.map((_,k) => k)); }
 function doCmd(cmd, arg){
